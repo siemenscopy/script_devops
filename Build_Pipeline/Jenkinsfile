@@ -1,0 +1,146 @@
+#!/usr/bin/env groovy
+pipeline{
+    agent { label 'iot_builder' }
+    options { skipDefaultCheckout() }
+    stages{
+
+        stage('1.Code'){
+            steps { 
+                echo "Job Namer: "+env.JOB_NAME
+                echo "Build Number: "+env.BUILD_NUMBER
+                script {
+                    project = env.JOB_NAME.split("_")[0]
+                    wrap([$class: "BuildUser"]){
+                        manager.addShortText("Build User: ${env.BUILD_USER}", "red", "white", "1px  ", "white")
+                        manager.addShortText("Build Branch: ${env.Branch}", "green", "white", "1px ", "white")
+                        manager.addShortText("Build Project: ${project}", "green", "white", "1px ", "white")
+                    }
+                    git branch: '${Branch}', url: 'git@code.siemens.com:IOT2040B/DEV/meta-iot2040b.git'
+                }
+                
+			}
+		}
+        stage('2.Build'){
+            steps { 
+                //build
+                echo "Build"
+                script {
+                    changeslog = getChangeLog()
+                    changescommitid = getChangeCommitID()
+                    changesauthor = getChangeAuthor()
+                    changesfile = getChageFile()
+                    echo "changeslog:"+changeslog
+                    echo "changescommitid: "+changescommitid
+                    echo "changesauthor: "+changesauthor
+                    echo "changesfile: "+changesfile
+                }
+            }
+        }
+        stage('3. package'){
+            steps{
+                echo "package ......" 
+            }
+        }
+        stage('4. upload'){
+            steps{
+                echo "upload ......" 
+            }
+        }
+    }
+}
+//以下可获取每次构建后新修改里的所有log
+@NonCPS
+def getChangeLog(){
+    MAX_MSG_LEN = 100
+    def changeString = ""
+    def changeLogSets = currentBuild.changeSets
+    for (int i = 0; i < changeLogSets.size(); i++){
+        def entries = changeLogSets[i].items
+        for (int j = 0; j < entries.length; j++){
+            def entry = entries[j]
+            change_msg = entry.msg.take(MAX_MSG_LEN)
+            if (changeLogSets.size() == 1){
+                changeString += "${change_msg}"
+            }
+            else{
+                changeString += "${change_msg} \n"
+            }
+        }
+    }
+    if (!changeString){
+        changeString = " No changes log "
+    }
+    return changeString
+}
+//以下可获取每次构建后新修改里的所有用户
+@NonCPS
+def getChangeAuthor() {
+    def changerAuthor = ""
+    def changeLogSets = currentBuild.rawBuild.changeSets
+    for (int i = 0; i < changeLogSets.size(); i++) {
+        def entries = changeLogSets[i].items
+        echo "entries: "+changeLogSets[i].items
+        for (int j = 0; j < entries.length; j++) {
+            def entry = entries[j]
+            if  (changeLogSets.size() == 1) {
+                changerAuthor += "${entry.author}"
+            }
+            else{
+                changerAuthor += "${entry.author} \n"
+            }
+        }
+    }
+    if (!changerAuthor) {
+        changerAuthor = " No changes author"
+    }
+    return changerAuthor;
+  }
+//以下可获取每次构建后新修改里的所有commitId
+@NonCPS
+def getChangeCommitID() {
+    def changerCommitid = ""
+    def changeLogSets = currentBuild.rawBuild.changeSets
+    for (int i = 0; i < changeLogSets.size(); i++) {
+        def entries = changeLogSets[i].items
+        echo "entries: "+changeLogSets[i].items
+        for (int j = 0; j < entries.length; j++) {
+            def entry = entries[j]
+            if ( changeLogSets.size() == 1){
+                changerCommitid += "${entry.commitId}"
+            }
+            else{
+                changerCommitid += "${entry.commitId} \n"
+            }
+        }
+    }
+    if (!changerCommitid) {
+        changerCommitid = " No changes"
+    }
+    return changerCommitid;
+  }
+//以下可获取每次构建后最新修改里的所有文件
+@NonCPS
+def getChageFile() {
+    def changeLogSets = currentBuild.rawBuild.changeSets 
+    def changerfile = ""
+    for (int i = 0; i < changeLogSets.size(); i++) {
+        def entries = changeLogSets[i].items
+        for (int j = 0; j < entries.length; j++) {
+            def entry = entries[j]
+            def files = new ArrayList(entry.affectedFiles)
+            for (int k = 0; k < files.size(); k++) {
+                def file = files[k]
+                if ( changeLogSets.size() == 1){
+                    changerfile += "${file.editType.name} ${file.path}"
+                }
+                else{
+                    changerfile += "${file.editType.name} ${file.path}\n"
+                }
+            }
+        }
+    }
+    if (!changerfile){
+        changerfile = "No file change"
+    }
+    return changerfile;
+ }
